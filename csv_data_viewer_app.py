@@ -10,10 +10,10 @@ st.set_page_config(page_title="CSV Data Viewer", layout="centered")
 st.title("📊 Clean CSV Data Viewer")
 st.write("Upload your classification CSV file to view and filter its contents interactively.")
 
-# Upload CSV file
+# --- File upload ---
 uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
 
-# Use pre-converted PNG logo (adjust path if needed)
+# Use pre-converted PNG logo (ensure this file exists at repo root when deploying)
 logo_png_path = "NOV_Logo_RGB_Full_Color.png"
 
 if uploaded_file:
@@ -22,14 +22,15 @@ if uploaded_file:
 
     try:
         df = pd.read_csv(uploaded_file, header=0 if use_header else None)
-        # Auto-generate column names if needed
+
+        # Auto-generate/normalize column names
         if df.shape[1] >= 3:
             df.columns = ["Name", "UOM", "Value"] + list(df.columns[3:])
         else:
             st.error("CSV must have at least three columns: Name, UOM, and Value.")
             st.stop()
 
-        # Drop extra columns if present
+        # Keep only expected columns
         df = df[["Name", "UOM", "Value"]]
 
         # Clean up formatting
@@ -41,19 +42,49 @@ if uploaded_file:
         df = df.applymap(clean_value)
         df = df.dropna(subset=["Name"]).reset_index(drop=True)
 
-        # Search bar
+        # --- Search ---
         search_term = st.sidebar.text_input("Search names")
         if search_term:
-            df = df[df["Name"].str.contains(search_term, case=False, na=False)]
+            df = df[df["Name"].str.contains(search_term, case=False, na=False)].reset_index(drop=True)
 
-        # Checkbox filters
+        # --- Select All that works reliably on Streamlit Cloud ---
+        # We keep explicit state for each row checkbox and synchronize via on_change callback
+        # to handle cold starts/reruns in the cloud.
+        def _set_all_rows():
+            """Callback to set all row checkboxes to the state of st.session_state.select_all."""
+            for i in range(len(df)):
+                st.session_state[f"row_{i}"] = st.session_state.select_all
+
+        # Initialize master toggle if missing
+        if "select_all" not in st.session_state:
+            st.session_state.select_all = True
+
+        # Master toggle with callback to propagate state
+        st.sidebar.checkbox(
+            "Select All",
+            value=st.session_state.select_all,
+            key="select_all",
+            on_change=_set_all_rows,
+        )
+
+        # Optional quick actions
+        col1, col2 = st.sidebar.columns(2)
+        if col1.button("All"):
+            st.session_state.select_all = True
+            _set_all_rows()
+        if col2.button("None"):
+            st.session_state.select_all = False
+            for i in range(len(df)):
+                st.session_state[f"row_{i}"] = False
+
+        # Row checkboxes
         st.sidebar.markdown("### Row Filters")
-        select_all = st.sidebar.checkbox("Select All", value=True)
-
         selected_rows = []
         for i, row in df.iterrows():
-            label = row["Name"]
-            checked = st.sidebar.checkbox(label, value=select_all, key=f"row_{i}")
+            key = f"row_{i}"
+            # Ensure a predictable initial value for each row based on the current master state
+            default_checked = st.session_state.get(key, st.session_state.select_all)
+            checked = st.sidebar.checkbox(row["Name"], value=default_checked, key=key)
             if checked:
                 selected_rows.append(i)
 
@@ -68,42 +99,44 @@ if uploaded_file:
             except Exception as e:
                 st.warning(f"Could not preview logo: {e}")
 
-            # Generate PDF
+            # --- PDF generation ---
             def generate_pdf(dataframe):
                 pdf = FPDF()
                 pdf.add_page()
-
 
                 # Calculate center position for logo
                 logo_width = 50  # Width of the logo in mm
                 page_width = pdf.w  # Total width of the page
                 center_x = (page_width - logo_width) / 2
 
-		#Logo
+                # Logo
                 try:
                     pdf.image(logo_png_path, x=center_x, y=8, w=logo_width)
                 except Exception as e:
                     st.warning(f"Could not render logo in PDF: {e}")
-		#Date
+
+                # Date
                 current_date = datetime.now().strftime("%B %d, %Y")
                 pdf.set_font("Arial", size=10)
                 pdf.cell(190, 10, txt=f"Print Date: {current_date}", ln=True, align='R')
-		#Title
+
+                # Title
                 pdf.set_font("Arial", 'B', 16)
                 pdf.ln(10)
                 pdf.cell(190, 10, txt="Engineering Data Sheet", ln=True, align='C')
                 pdf.ln(10)
-		#Table Header
+
+                # Table
                 indent_x = 20
                 pdf.set_x(indent_x)
-                col_widths = [60, 100, 20]
-		#Table body
+                col_widths = [60, 100, 20]  # Name, Value, UOM
+
                 pdf.set_font("Arial", size=10)
-                for index, row in dataframe.iterrows():
+                for _, r in dataframe.iterrows():
                     pdf.set_x(indent_x)
-                    pdf.cell(col_widths[0], 10, str(row["Name"]), border=0)
-                    pdf.cell(col_widths[1], 10, str(row["Value"]), border=0)
-                    pdf.cell(col_widths[2], 10, str(row["UOM"]), border=0)
+                    pdf.cell(col_widths[0], 10, str(r["Name"]), border=0)
+                    pdf.cell(col_widths[1], 10, str(r["Value"]), border=0)
+                    pdf.cell(col_widths[2], 10, str(r["UOM"]), border=0)
                     pdf.ln()
 
                 return pdf.output(dest='S').encode('latin1')
@@ -114,7 +147,7 @@ if uploaded_file:
                 label="📄 Download Filtered Data as PDF",
                 data=pdf_bytes,
                 file_name="classification.pdf",
-                mime="application/pdf"
+                mime="application/pdf",
             )
         else:
             st.info("Use the checkboxes in the sidebar to select which data to display.")
