@@ -18,10 +18,10 @@ logo_png_path = "NOV_Logo_RGB_Full_Color.png"
 
 if uploaded_file:
     st.sidebar.header("Settings")
-    use_header = st.sidebar.checkbox("First row contains headers", value=False)
 
     try:
-        df = pd.read_csv(uploaded_file, header=0 if use_header else None)
+        # Always assume first row contains headers
+        df = pd.read_csv(uploaded_file, header=0)
 
         # Auto-generate/normalize column names
         if df.shape[1] >= 3:
