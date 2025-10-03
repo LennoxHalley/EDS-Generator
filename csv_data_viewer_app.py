@@ -48,18 +48,14 @@ if uploaded_file:
             df = df[df["Name"].str.contains(search_term, case=False, na=False)].reset_index(drop=True)
 
         # --- Select All that works reliably on Streamlit Cloud ---
-        # We keep explicit state for each row checkbox and synchronize via on_change callback
-        # to handle cold starts/reruns in the cloud.
         def _set_all_rows():
             """Callback to set all row checkboxes to the state of st.session_state.select_all."""
             for i in range(len(df)):
                 st.session_state[f"row_{i}"] = st.session_state.select_all
 
-        # Initialize master toggle if missing
         if "select_all" not in st.session_state:
             st.session_state.select_all = True
 
-        # Master toggle with callback to propagate state
         st.sidebar.checkbox(
             "Select All",
             value=st.session_state.select_all,
@@ -67,22 +63,11 @@ if uploaded_file:
             on_change=_set_all_rows,
         )
 
-        # Optional quick actions
-        col1, col2 = st.sidebar.columns(2)
-        if col1.button("All"):
-            st.session_state.select_all = True
-            _set_all_rows()
-        if col2.button("None"):
-            st.session_state.select_all = False
-            for i in range(len(df)):
-                st.session_state[f"row_{i}"] = False
-
         # Row checkboxes
         st.sidebar.markdown("### Row Filters")
         selected_rows = []
         for i, row in df.iterrows():
             key = f"row_{i}"
-            # Ensure a predictable initial value for each row based on the current master state
             default_checked = st.session_state.get(key, st.session_state.select_all)
             checked = st.sidebar.checkbox(row["Name"], value=default_checked, key=key)
             if checked:
