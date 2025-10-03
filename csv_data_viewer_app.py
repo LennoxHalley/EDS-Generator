@@ -7,14 +7,23 @@ from PIL import Image
 from datetime import datetime
 
 st.set_page_config(page_title="CSV Data Viewer", layout="centered")
-st.title("📊 Clean CSV Data Viewer")
+
+# Use pre-converted PNG logo (ensure this file exists at repo root when deploying)
+logo_png_path = "NOV_Logo_RGB_Full_Color.png"
+
+# Centered logo above title
+st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+try:
+    st.image(logo_png_path, width=100)
+except Exception as e:
+    st.warning(f"Could not display logo: {e}")
+st.title("EDS Generator")
+st.markdown("</div>", unsafe_allow_html=True)
+
 st.write("Upload your classification CSV file to view and filter its contents interactively.")
 
 # --- File upload ---
 uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
-
-# Use pre-converted PNG logo (ensure this file exists at repo root when deploying)
-logo_png_path = "NOV_Logo_RGB_Full_Color.png"
 
 if uploaded_file:
     st.sidebar.header("Settings")
@@ -77,12 +86,6 @@ if uploaded_file:
             filtered_df = df.loc[selected_rows].reset_index(drop=True)
             st.subheader("Filtered Data Table")
             st.dataframe(filtered_df)
-
-            # Preview logo in app
-            try:
-                st.image(logo_png_path, width=150)
-            except Exception as e:
-                st.warning(f"Could not preview logo: {e}")
 
             # --- PDF generation ---
             def generate_pdf(dataframe):
