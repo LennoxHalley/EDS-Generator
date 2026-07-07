@@ -113,7 +113,7 @@ def draw_page_layout(pdf, tool_image_path=None):
     left_margin = 10
     right_margin = 10
     top_logo_y = 6
-    title_y = 22
+    title_y = 34
     table_top_y = 40
     bottom_margin = 10
 
