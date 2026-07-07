@@ -122,9 +122,11 @@ def draw_page_layout(pdf, tool_image_path=None):
     image_y = table_top_y
     image_box_h = page_h - image_y - bottom_margin
 
-    # Logo in the upper-left
+    # Logo in the centre
+    logo_width = 50
+    center_x = (page_w - logo_width) / 2
     try:
-        pdf.image(logo_png_path, x=left_margin, y=top_logo_y, w=38)
+        pdf.image(logo_png_path, x=center_x, y=6, w=logo_width)
     except Exception:
         pass
 
@@ -137,7 +139,7 @@ def draw_page_layout(pdf, tool_image_path=None):
     # Title
     pdf.set_font("Arial", "B", 16)
     pdf.set_y(title_y)
-    pdf.cell(0, 8, txt="Engineering Data Sheet", ln=True, align="C")
+    pdf.cell(0, 8, txt="Technical Data Sheet", ln=True, align="C")
 
     # Full-height image panel on the right
     pdf.set_draw_color(0, 0, 0)
@@ -228,10 +230,10 @@ def generate_pdf(dataframe, tool_image_path=None):
         pdf.multi_cell(col_widths[0] - 2, line_height, name, border=0)
 
         pdf.set_xy(x2 + 1, y + 1)
-        pdf.multi_cell(col_widths[1] - 2, line_height, value, border=0)
+        pdf.multi_cell(col_widths[1] - 2, line_height, value, border=0,align="R")
 
         pdf.set_xy(x3 + 1, y + 1)
-        pdf.multi_cell(col_widths[2] - 2, line_height, uom, border=0)
+        pdf.multi_cell(col_widths[2] - 2, line_height, uom, border=0,align="C")
 
         pdf.set_y(y + row_height)
 
