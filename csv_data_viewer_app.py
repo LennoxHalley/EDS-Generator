@@ -3,12 +3,16 @@ import pandas as pd
 import re
 from fpdf import FPDF
 from datetime import datetime
+from tempfile import NamedTemporaryFile
+from pathlib import Path
 
 st.set_page_config(page_title="CSV Data Viewer", layout="centered")
 st.title("📊 Clean CSV Data Viewer")
 st.write("Upload your classification CSV file to view and filter its contents interactively.")
 
 uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+tool_image_file = st.file_uploader("Choose a tool image", type=["png", "jpg", "jpeg"])
+
 logo_png_path = "NOV_Logo_RGB_Full_Color.png"
 
 
@@ -69,14 +73,38 @@ def draw_table_header(pdf, x0, col_widths):
     pdf.ln(header_height)
 
 
-def generate_pdf(dataframe):
+def save_uploaded_image(uploaded_image):
+    if uploaded_image is None:
+        return None
+
+    suffix = Path(uploaded_image.name).suffix.lower()
+    if suffix not in [".png", ".jpg", ".jpeg"]:
+        suffix = ".png"
+
+    temp_file = NamedTemporaryFile(delete=False, suffix=suffix)
+    temp_file.write(uploaded_image.getbuffer())
+    temp_file.flush()
+    temp_file.close()
+    return temp_file.name
+
+
+def generate_pdf(dataframe, tool_image_path=None):
     pdf = FPDF(unit="mm", format="A4")
     pdf.set_auto_page_break(False)
     pdf.set_margins(15, 15, 15)
     pdf.add_page()
 
-    logo_width = 50
     page_width = pdf.w
+    content_left = 15
+    content_right = 15
+    gap = 5
+
+    image_box_w = 45
+    image_box_h = 90
+    image_x = page_width - content_right - image_box_w
+    image_y = 42
+
+    logo_width = 50
     center_x = (page_width - logo_width) / 2
 
     try:
@@ -93,8 +121,25 @@ def generate_pdf(dataframe):
     pdf.set_y(28)
     pdf.cell(0, 10, txt="Engineering Data Sheet", ln=True, align="C")
 
-    x0 = 15
-    col_widths = [70, 90, 20]
+    # Tool image area on the right
+    pdf.set_draw_color(0, 0, 0)
+    pdf.rect(image_x, image_y, image_box_w, image_box_h)
+
+    if tool_image_path:
+        try:
+            pdf.image(tool_image_path, x=image_x + 1, y=image_y + 1, w=image_box_w - 2, h=image_box_h - 2)
+        except Exception:
+            pdf.set_font("Arial", "I", 9)
+            pdf.set_xy(image_x + 3, image_y + 5)
+            pdf.multi_cell(image_box_w - 6, 5, "Tool image here", align="C")
+    else:
+        pdf.set_font("Arial", "I", 9)
+        pdf.set_xy(image_x + 3, image_y + 5)
+        pdf.multi_cell(image_box_w - 6, 5, "Tool image here", align="C")
+
+    # Table area on the left
+    x0 = content_left
+    col_widths = [67, 58, 20]
     line_height = 5
     bottom_margin = 15
     page_break_limit = pdf.h - bottom_margin
@@ -149,6 +194,8 @@ def generate_pdf(dataframe):
 
 if uploaded_file:
     try:
+        tool_image_path = save_uploaded_image(tool_image_file)
+
         df = pd.read_csv(uploaded_file, header=0)
         df.columns = df.columns.str.strip()
 
@@ -203,7 +250,7 @@ if uploaded_file:
                 st.warning(f"Could not preview logo: {e}")
 
             try:
-                pdf_bytes = generate_pdf(filtered_df)
+                pdf_bytes = generate_pdf(filtered_df, tool_image_path=tool_image_path)
                 st.download_button(
                     label="📄 Download Filtered Data as PDF",
                     data=pdf_bytes,
