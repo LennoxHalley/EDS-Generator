@@ -112,9 +112,9 @@ def draw_page_layout(pdf, tool_image_path=None):
 
     left_margin = 10
     right_margin = 10
-    top_logo_y = 6
-    title_y = 34
-    table_top_y = 40
+    top_logo_y = 4
+    title_y = 36
+    table_top_y = 50
     bottom_margin = 10
 
     image_box_w = 45
@@ -122,22 +122,28 @@ def draw_page_layout(pdf, tool_image_path=None):
     image_y = table_top_y
     image_box_h = page_h - image_y - bottom_margin
 
-    # Logo in the centre
-    logo_width = 50
+    # Center the NOV logo
+    logo_width = 52
     center_x = (page_w - logo_width) / 2
     try:
-        pdf.image(logo_png_path, x=center_x, y=6, w=logo_width)
+        pdf.image(logo_png_path, x=center_x, y=3, w=logo_width)
     except Exception:
         pass
 
     # Print date in upper-right
     current_date = datetime.now().strftime("%B %d, %Y")
-    pdf.set_font("Arial", size=10)
-    pdf.set_xy(0, 8)
-    pdf.cell(page_w - right_margin, 8, txt=f"Print Date: {current_date}", ln=0, align="R")
+    
+    pdf.set_font("Arial","", 9)
+    pdf.set_text_color(90, 90, 90)
+    
+    pdf.set_xy(0, title_y + 1)
+    
+    pdf.cell(page_w - right_margin, 8, txt=f"Print Date: {current_date}", align="R")
+
+    pdf.set_text_color(0, 0, 0)
 
     # Title
-    pdf.set_font("Arial", "B", 16)
+    pdf.set_font("Arial", "B", 18)
     pdf.set_y(title_y)
     pdf.cell(0, 8, txt="Technical Data Sheet", ln=True, align="C")
 
@@ -181,8 +187,8 @@ def generate_pdf(dataframe, tool_image_path=None):
     table_right = image_x - gap_to_image
     table_width = table_right - x0
 
-    # Wider Name column, narrower UOM column, like the example layout
-    col_widths = [70, 55, table_width - 70 - 55]
+    # Wider Name column, narrower UOM column, middle column right-aligned
+    col_widths = [74, 51, table_width - 74 - 55]
     line_height = 5
     bottom_margin = 10
     page_break_limit = pdf.h - bottom_margin
@@ -230,10 +236,10 @@ def generate_pdf(dataframe, tool_image_path=None):
         pdf.multi_cell(col_widths[0] - 2, line_height, name, border=0)
 
         pdf.set_xy(x2 + 1, y + 1)
-        pdf.multi_cell(col_widths[1] - 2, line_height, value, border=0,align="R")
+        pdf.multi_cell(col_widths[1] - 2, line_height, value, border=0, align="L")
 
         pdf.set_xy(x3 + 1, y + 1)
-        pdf.multi_cell(col_widths[2] - 2, line_height, uom, border=0,align="C")
+        pdf.multi_cell(col_widths[2] - 2, line_height, uom, border=0, align="C")
 
         pdf.set_y(y + row_height)
 
