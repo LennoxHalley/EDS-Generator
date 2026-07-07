@@ -5,13 +5,14 @@ from fpdf import FPDF
 from datetime import datetime
 from tempfile import NamedTemporaryFile
 from pathlib import Path
+from PIL import Image
 
 st.set_page_config(page_title="CSV Data Viewer", layout="centered")
 st.title("📊 Clean CSV Data Viewer")
 st.write("Upload your classification CSV file to view and filter its contents interactively.")
 
 uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
-tool_image_file = st.file_uploader("Choose a tool image", type=["png", "jpg", "jpeg"])
+tool_image_file = st.file_uploader("Choose a tool image (optional)", type=["png", "jpg", "jpeg"])
 
 logo_png_path = "NOV_Logo_RGB_Full_Color.png"
 
@@ -62,17 +63,6 @@ def wrap_text(pdf, text, width):
     return lines if lines else [""]
 
 
-def draw_table_header(pdf, x0, col_widths):
-    header_height = 8
-    pdf.set_fill_color(235, 235, 235)
-    pdf.set_font("Arial", "B", 9)
-    pdf.set_x(x0)
-    pdf.cell(col_widths[0], header_height, "Name", border=1, align="C", fill=True)
-    pdf.cell(col_widths[1], header_height, "Value", border=1, align="C", fill=True)
-    pdf.cell(col_widths[2], header_height, "UOM", border=1, align="C", fill=True)
-    pdf.ln(header_height)
-
-
 def save_uploaded_image(uploaded_image):
     if uploaded_image is None:
         return None
@@ -88,46 +78,82 @@ def save_uploaded_image(uploaded_image):
     return temp_file.name
 
 
-def generate_pdf(dataframe, tool_image_path=None):
-    pdf = FPDF(unit="mm", format="A4")
-    pdf.set_auto_page_break(False)
-    pdf.set_margins(15, 15, 15)
-    pdf.add_page()
+def draw_table_header(pdf, x0, col_widths):
+    header_height = 8
+    pdf.set_fill_color(235, 235, 235)
+    pdf.set_font("Arial", "B", 9)
+    pdf.set_x(x0)
+    pdf.cell(col_widths[0], header_height, "Name", border=1, align="C", fill=True)
+    pdf.cell(col_widths[1], header_height, "Value", border=1, align="C", fill=True)
+    pdf.cell(col_widths[2], header_height, "UOM", border=1, align="C", fill=True)
+    pdf.ln(header_height)
 
-    page_width = pdf.w
-    content_left = 15
-    content_right = 15
-    gap = 5
+
+def fit_image_into_box(image_path, box_w, box_h):
+    with Image.open(image_path) as img:
+        img_w, img_h = img.size
+
+    img_ratio = img_w / img_h
+    box_ratio = box_w / box_h
+
+    if img_ratio > box_ratio:
+        draw_w = box_w
+        draw_h = box_w / img_ratio
+    else:
+        draw_h = box_h
+        draw_w = box_h * img_ratio
+
+    return draw_w, draw_h
+
+
+def draw_page_layout(pdf, tool_image_path=None):
+    page_w = pdf.w
+    page_h = pdf.h
+
+    left_margin = 10
+    right_margin = 10
+    top_logo_y = 6
+    title_y = 22
+    table_top_y = 40
+    bottom_margin = 10
 
     image_box_w = 45
-    image_box_h = 90
-    image_x = page_width - content_right - image_box_w
-    image_y = 42
+    image_x = page_w - right_margin - image_box_w
+    image_y = table_top_y
+    image_box_h = page_h - image_y - bottom_margin
 
-    logo_width = 50
-    center_x = (page_width - logo_width) / 2
-
+    # Logo in the upper-left
     try:
-        pdf.image(logo_png_path, x=center_x, y=8, w=logo_width)
+        pdf.image(logo_png_path, x=left_margin, y=top_logo_y, w=38)
     except Exception:
         pass
 
+    # Print date in upper-right
     current_date = datetime.now().strftime("%B %d, %Y")
     pdf.set_font("Arial", size=10)
-    pdf.set_y(12)
-    pdf.cell(0, 10, txt=f"Print Date: {current_date}", ln=True, align="R")
+    pdf.set_xy(0, 8)
+    pdf.cell(page_w - right_margin, 8, txt=f"Print Date: {current_date}", ln=0, align="R")
 
+    # Title
     pdf.set_font("Arial", "B", 16)
-    pdf.set_y(28)
-    pdf.cell(0, 10, txt="Engineering Data Sheet", ln=True, align="C")
+    pdf.set_y(title_y)
+    pdf.cell(0, 8, txt="Engineering Data Sheet", ln=True, align="C")
 
-    # Tool image area on the right
+    # Full-height image panel on the right
     pdf.set_draw_color(0, 0, 0)
     pdf.rect(image_x, image_y, image_box_w, image_box_h)
 
     if tool_image_path:
         try:
-            pdf.image(tool_image_path, x=image_x + 1, y=image_y + 1, w=image_box_w - 2, h=image_box_h - 2)
+            inner_pad = 2
+            draw_w, draw_h = fit_image_into_box(
+                tool_image_path,
+                image_box_w - (2 * inner_pad),
+                image_box_h - (2 * inner_pad),
+            )
+            img_x = image_x + (image_box_w - draw_w) / 2
+            img_y = image_y + (image_box_h - draw_h) / 2
+            pdf.image(tool_image_path, x=img_x, y=img_y, w=draw_w, h=draw_h)
         except Exception:
             pdf.set_font("Arial", "I", 9)
             pdf.set_xy(image_x + 3, image_y + 5)
@@ -137,14 +163,29 @@ def generate_pdf(dataframe, tool_image_path=None):
         pdf.set_xy(image_x + 3, image_y + 5)
         pdf.multi_cell(image_box_w - 6, 5, "Tool image here", align="C")
 
-    # Table area on the left
-    x0 = content_left
-    col_widths = [67, 58, 20]
+    return table_top_y, image_x
+
+
+def generate_pdf(dataframe, tool_image_path=None):
+    pdf = FPDF(unit="mm", format="A4")
+    pdf.set_auto_page_break(False)
+    pdf.set_margins(10, 10, 10)
+    pdf.add_page()
+
+    table_top_y, image_x = draw_page_layout(pdf, tool_image_path=tool_image_path)
+
+    x0 = 10
+    gap_to_image = 4
+    table_right = image_x - gap_to_image
+    table_width = table_right - x0
+
+    # Wider Name column, narrower UOM column, like the example layout
+    col_widths = [70, 55, table_width - 70 - 55]
     line_height = 5
-    bottom_margin = 15
+    bottom_margin = 10
     page_break_limit = pdf.h - bottom_margin
 
-    pdf.set_y(42)
+    pdf.set_y(table_top_y)
     draw_table_header(pdf, x0, col_widths)
 
     pdf.set_font("Arial", size=9)
@@ -164,8 +205,13 @@ def generate_pdf(dataframe, tool_image_path=None):
 
         if pdf.get_y() + row_height > page_break_limit:
             pdf.add_page()
-            pdf.set_font("Arial", "B", 9)
-            pdf.set_y(15)
+            table_top_y, image_x = draw_page_layout(pdf, tool_image_path=tool_image_path)
+
+            table_right = image_x - gap_to_image
+            table_width = table_right - x0
+            col_widths = [70, 55, table_width - 70 - 55]
+
+            pdf.set_y(table_top_y)
             draw_table_header(pdf, x0, col_widths)
             pdf.set_font("Arial", size=9)
 
