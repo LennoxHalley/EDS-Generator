@@ -8,7 +8,7 @@ from pathlib import Path
 from PIL import Image
 
 st.set_page_config(page_title="CSV Data Viewer", layout="centered")
-st.title("📊 Clean CSV Data Viewer")
+st.title("Technical Data Sheet Generator")
 st.write("Upload your classification CSV file to view and filter its contents interactively.")
 
 uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
