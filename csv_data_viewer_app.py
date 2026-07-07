@@ -17,7 +17,7 @@ try:
     st.image(logo_png_path, width=100)
 except Exception as e:
     st.warning(f"Could not display logo: {e}")
-st.title("TDS Generator")
+st.title("EDS Generator")
 st.markdown("</div>", unsafe_allow_html=True)
 
 st.write("Upload your classification CSV file to view and filter its contents interactively.")
@@ -48,7 +48,7 @@ if uploaded_file:
                 return re.sub(r'^="|"$', '', val).strip()
             return val
 
-        df = df.map(clean_value)
+        df = df.applymap(clean_value)
         df = df.dropna(subset=["Name"]).reset_index(drop=True)
 
         # --- Search ---
@@ -111,7 +111,7 @@ if uploaded_file:
                 # Title
                 pdf.set_font("Arial", 'B', 16)
                 pdf.ln(10)
-                pdf.cell(190, 10, txt="Technical Data Sheet", ln=True, align='C')
+                pdf.cell(190, 10, txt="Engineering Data Sheet", ln=True, align='C')
                 pdf.ln(10)
 
                 # Table
