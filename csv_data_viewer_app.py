@@ -14,9 +14,8 @@ logo_png_path = "NOV_Logo_RGB_Full_Color.png"
 
 
 def clean_value(val):
-    """Remove Excel-style wrapping quotes like ="text" and trim whitespace."""
     if isinstance(val, str):
-        return re.sub(r'^="|"$', '', val).strip()
+        return re.sub(r'^="|"$', "", val).strip()
     return val
 
 
@@ -24,7 +23,6 @@ def generate_pdf(dataframe):
     pdf = FPDF()
     pdf.add_page()
 
-    # Logo
     logo_width = 50
     page_width = pdf.w
     center_x = (page_width - logo_width) / 2
@@ -34,22 +32,18 @@ def generate_pdf(dataframe):
     except Exception:
         pass
 
-    # Date
     current_date = datetime.now().strftime("%B %d, %Y")
     pdf.set_font("Arial", size=10)
     pdf.cell(190, 10, txt=f"Print Date: {current_date}", ln=True, align="R")
 
-    # Title
     pdf.set_font("Arial", "B", 16)
     pdf.ln(10)
     pdf.cell(190, 10, txt="Engineering Data Sheet", ln=True, align="C")
     pdf.ln(10)
 
-    # Table layout
     indent_x = 20
     col_widths = [60, 100, 20]
 
-    # Header row
     pdf.set_x(indent_x)
     pdf.set_font("Arial", "B", 10)
     pdf.cell(col_widths[0], 10, "Name", border=0)
@@ -57,7 +51,6 @@ def generate_pdf(dataframe):
     pdf.cell(col_widths[2], 10, "UOM", border=0)
     pdf.ln()
 
-    # Body rows
     pdf.set_font("Arial", size=10)
     for _, row in dataframe.iterrows():
         pdf.set_x(indent_x)
@@ -70,14 +63,12 @@ def generate_pdf(dataframe):
 
 
 if uploaded_file:
-    try:
-        # Read the CSV using the header row
-        df = pd.read_csv(uploaded_file, header=0)
+    st.sidebar.header("Settings")
 
-        # Clean up header names
+    try:
+        df = pd.read_csv(uploaded_file, header=0)
         df.columns = df.columns.str.strip()
 
-        # Keep only the columns needed for the PDF
         required_columns = ["Name", "Value", "UOM"]
         missing = [col for col in required_columns if col not in df.columns]
 
@@ -87,18 +78,15 @@ if uploaded_file:
 
         df = df[["Name", "Value", "UOM"]]
 
-        # Clean up formatting in the data
         for col in ["Name", "Value", "UOM"]:
             df[col] = df[col].map(clean_value)
 
         df = df.dropna(subset=["Name"]).reset_index(drop=True)
 
-        # Search bar
         search_term = st.sidebar.text_input("Search names")
         if search_term:
             df = df[df["Name"].astype(str).str.contains(search_term, case=False, na=False)].reset_index(drop=True)
 
-        # Row filter checkboxes
         st.sidebar.markdown("### Row Filters")
 
         if "select_all" not in st.session_state:
@@ -148,4 +136,3 @@ if uploaded_file:
         st.error(f"Failed to read CSV file: {e}")
 else:
     st.info("Awaiting CSV upload...")
-```
