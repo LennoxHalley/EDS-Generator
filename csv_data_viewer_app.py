@@ -14,13 +14,65 @@ logo_png_path = "NOV_Logo_RGB_Full_Color.png"
 
 
 def clean_value(val):
-    if isinstance(val, str):
-        return re.sub(r'^="|"$', "", val).strip()
-    return val
+    if pd.isna(val):
+        return ""
+    text = str(val).strip()
+    if text.lower() == "nan":
+        return ""
+    return re.sub(r'^="|"$', "", text).strip()
+
+
+def wrap_text(pdf, text, width):
+    text = clean_value(text)
+    if not text:
+        return [""]
+
+    words = text.split()
+    lines = []
+    current = ""
+
+    for word in words:
+        test_line = word if not current else f"{current} {word}"
+        if pdf.get_string_width(test_line) <= width:
+            current = test_line
+        else:
+            if current:
+                lines.append(current)
+
+            if pdf.get_string_width(word) <= width:
+                current = word
+            else:
+                chunk = ""
+                for ch in word:
+                    test_chunk = chunk + ch
+                    if pdf.get_string_width(test_chunk) <= width:
+                        chunk = test_chunk
+                    else:
+                        if chunk:
+                            lines.append(chunk)
+                        chunk = ch
+                current = chunk
+
+    if current:
+        lines.append(current)
+
+    return lines if lines else [""]
+
+
+def draw_table_header(pdf, indent_x, col_widths):
+    header_height = 8
+    pdf.set_fill_color(235, 235, 235)
+    pdf.set_font("Arial", "B", 10)
+    pdf.set_x(indent_x)
+    pdf.cell(col_widths[0], header_height, "Name", border=1, align="C", fill=True)
+    pdf.cell(col_widths[1], header_height, "Value", border=1, align="C", fill=True)
+    pdf.cell(col_widths[2], header_height, "UOM", border=1, align="C", fill=True)
+    pdf.ln(header_height)
 
 
 def generate_pdf(dataframe):
     pdf = FPDF()
+    pdf.set_auto_page_break(auto=False)
     pdf.add_page()
 
     logo_width = 50
@@ -34,30 +86,65 @@ def generate_pdf(dataframe):
 
     current_date = datetime.now().strftime("%B %d, %Y")
     pdf.set_font("Arial", size=10)
-    pdf.cell(190, 10, txt=f"Print Date: {current_date}", ln=True, align="R")
+    pdf.set_y(12)
+    pdf.cell(0, 10, txt=f"Print Date: {current_date}", ln=True, align="R")
 
     pdf.set_font("Arial", "B", 16)
     pdf.ln(10)
-    pdf.cell(190, 10, txt="Engineering Data Sheet", ln=True, align="C")
-    pdf.ln(10)
+    pdf.cell(0, 10, txt="Engineering Data Sheet", ln=True, align="C")
+    pdf.ln(6)
 
-    indent_x = 20
-    col_widths = [60, 100, 20]
+    indent_x = 15
+    col_widths = [55, 105, 20]
+    line_height = 5
+    bottom_margin = 15
+    page_break_limit = pdf.h - bottom_margin
 
-    pdf.set_x(indent_x)
-    pdf.set_font("Arial", "B", 10)
-    pdf.cell(col_widths[0], 10, "Name", border=0)
-    pdf.cell(col_widths[1], 10, "Value", border=0)
-    pdf.cell(col_widths[2], 10, "UOM", border=0)
-    pdf.ln()
+    pdf.set_y(50)
+    draw_table_header(pdf, indent_x, col_widths)
 
     pdf.set_font("Arial", size=10)
+
     for _, row in dataframe.iterrows():
-        pdf.set_x(indent_x)
-        pdf.cell(col_widths[0], 10, str(row["Name"]), border=0)
-        pdf.cell(col_widths[1], 10, str(row["Value"]), border=0)
-        pdf.cell(col_widths[2], 10, str(row["UOM"]), border=0)
-        pdf.ln()
+        name = clean_value(row["Name"])
+        value = clean_value(row["Value"])
+        uom = clean_value(row["UOM"])
+
+        name_lines = wrap_text(pdf, name, col_widths[0] - 2)
+        value_lines = wrap_text(pdf, value, col_widths[1] - 2)
+        uom_lines = wrap_text(pdf, uom, col_widths[2] - 2)
+
+        row_height = max(len(name_lines), len(value_lines), len(uom_lines)) * line_height
+        if row_height < line_height:
+            row_height = line_height
+
+        if pdf.get_y() + row_height > page_break_limit:
+            pdf.add_page()
+            pdf.set_font("Arial", "B", 10)
+            pdf.set_y(15)
+            draw_table_header(pdf, indent_x, col_widths)
+            pdf.set_font("Arial", size=10)
+
+        y = pdf.get_y()
+
+        x1 = indent_x
+        x2 = x1 + col_widths[0]
+        x3 = x2 + col_widths[1]
+
+        pdf.rect(x1, y, col_widths[0], row_height)
+        pdf.rect(x2, y, col_widths[1], row_height)
+        pdf.rect(x3, y, col_widths[2], row_height)
+
+        pdf.set_xy(x1 + 1, y + 1)
+        pdf.multi_cell(col_widths[0] - 2, line_height, name, border=0)
+
+        pdf.set_xy(x2 + 1, y + 1)
+        pdf.multi_cell(col_widths[1] - 2, line_height, value, border=0)
+
+        pdf.set_xy(x3 + 1, y + 1)
+        pdf.multi_cell(col_widths[2] - 2, line_height, uom, border=0)
+
+        pdf.set_y(y + row_height)
 
     return pdf.output(dest="S").encode("latin1")
 
