@@ -48,7 +48,7 @@ if uploaded_file:
                 return re.sub(r'^="|"$', '', val).strip()
             return val
 
-        df = df.applymap(clean_value)
+        df = df.map(clean_value)
         df = df.dropna(subset=["Name"]).reset_index(drop=True)
 
         # --- Search ---
