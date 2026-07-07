@@ -9,7 +9,6 @@ st.title("📊 Clean CSV Data Viewer")
 st.write("Upload your classification CSV file to view and filter its contents interactively.")
 
 uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
-
 logo_png_path = "NOV_Logo_RGB_Full_Color.png"
 
 
@@ -32,9 +31,9 @@ def wrap_text(pdf, text, width):
     current = ""
 
     for word in words:
-        test_line = word if not current else f"{current} {word}"
-        if pdf.get_string_width(test_line) <= width:
-            current = test_line
+        tentative = word if not current else f"{current} {word}"
+        if pdf.get_string_width(tentative) <= width:
+            current = tentative
         else:
             if current:
                 lines.append(current)
@@ -59,11 +58,11 @@ def wrap_text(pdf, text, width):
     return lines if lines else [""]
 
 
-def draw_table_header(pdf, indent_x, col_widths):
+def draw_table_header(pdf, x0, col_widths):
     header_height = 8
     pdf.set_fill_color(235, 235, 235)
-    pdf.set_font("Arial", "B", 10)
-    pdf.set_x(indent_x)
+    pdf.set_font("Arial", "B", 9)
+    pdf.set_x(x0)
     pdf.cell(col_widths[0], header_height, "Name", border=1, align="C", fill=True)
     pdf.cell(col_widths[1], header_height, "Value", border=1, align="C", fill=True)
     pdf.cell(col_widths[2], header_height, "UOM", border=1, align="C", fill=True)
@@ -71,8 +70,9 @@ def draw_table_header(pdf, indent_x, col_widths):
 
 
 def generate_pdf(dataframe):
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=False)
+    pdf = FPDF(unit="mm", format="A4")
+    pdf.set_auto_page_break(False)
+    pdf.set_margins(15, 15, 15)
     pdf.add_page()
 
     logo_width = 50
@@ -90,20 +90,19 @@ def generate_pdf(dataframe):
     pdf.cell(0, 10, txt=f"Print Date: {current_date}", ln=True, align="R")
 
     pdf.set_font("Arial", "B", 16)
-    pdf.ln(10)
+    pdf.set_y(28)
     pdf.cell(0, 10, txt="Engineering Data Sheet", ln=True, align="C")
-    pdf.ln(6)
 
-    indent_x = 15
-    col_widths = [55, 105, 20]
+    x0 = 15
+    col_widths = [70, 90, 20]
     line_height = 5
     bottom_margin = 15
     page_break_limit = pdf.h - bottom_margin
 
-    pdf.set_y(50)
-    draw_table_header(pdf, indent_x, col_widths)
+    pdf.set_y(42)
+    draw_table_header(pdf, x0, col_widths)
 
-    pdf.set_font("Arial", size=10)
+    pdf.set_font("Arial", size=9)
 
     for _, row in dataframe.iterrows():
         name = clean_value(row["Name"])
@@ -114,20 +113,19 @@ def generate_pdf(dataframe):
         value_lines = wrap_text(pdf, value, col_widths[1] - 2)
         uom_lines = wrap_text(pdf, uom, col_widths[2] - 2)
 
-        row_height = max(len(name_lines), len(value_lines), len(uom_lines)) * line_height
-        if row_height < line_height:
-            row_height = line_height
+        row_height = max(len(name_lines), len(value_lines), len(uom_lines)) * line_height + 2
+        if row_height < 8:
+            row_height = 8
 
         if pdf.get_y() + row_height > page_break_limit:
             pdf.add_page()
-            pdf.set_font("Arial", "B", 10)
+            pdf.set_font("Arial", "B", 9)
             pdf.set_y(15)
-            draw_table_header(pdf, indent_x, col_widths)
-            pdf.set_font("Arial", size=10)
+            draw_table_header(pdf, x0, col_widths)
+            pdf.set_font("Arial", size=9)
 
         y = pdf.get_y()
-
-        x1 = indent_x
+        x1 = x0
         x2 = x1 + col_widths[0]
         x3 = x2 + col_widths[1]
 
@@ -150,8 +148,6 @@ def generate_pdf(dataframe):
 
 
 if uploaded_file:
-    st.sidebar.header("Settings")
-
     try:
         df = pd.read_csv(uploaded_file, header=0)
         df.columns = df.columns.str.strip()
